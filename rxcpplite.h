@@ -9,19 +9,69 @@ namespace rxcpplite
 namespace cxx   = std;
 using error_ptr = std::exception_ptr;
 
-using value = int;
+template <typename T> class typed_value;
 
-using fn_next_t     = std::function<void(value)>;
+class abstruct_value : public cxx::enable_shared_from_this<abstruct_value>
+{
+public:
+    using sp = cxx::shared_ptr<abstruct_value>;
+    
+private:
+protected:
+    abstruct_value() = default;
+
+public:
+    virtual ~abstruct_value() = default;
+
+    template<typename T> cxx::shared_ptr<const typed_value<T>> as() const
+    {
+        return cxx::dynamic_pointer_cast<const typed_value<T>>(shared_from_this());
+    }
+
+    template<typename T> const T& value() const
+    {
+        return as<T>()->value();
+    }
+};
+
+template <typename T> class typed_value : public abstruct_value
+{
+public:
+    using sp = cxx::shared_ptr<typed_value<T>>;
+    
+private:
+    T m_value;
+    typed_value(T&& v) : m_value(v) {}
+    typed_value(T& v) : m_value(v) {}
+
+protected:
+
+public:
+    static sp create(T&& v)
+    {
+        return sp(new typed_value<T>(v));
+    }
+
+    static sp create(T& v)
+    {
+        return sp(new typed_value<T>(std::forward(v)));
+    }
+    
+    const T& value() const { return m_value; }
+    operator const T& () const { return m_value; }
+};
+
+using fn_next_t     = std::function<void(abstruct_value::sp)>;
 using fn_error_t    = std::function<void(error_ptr)>;
 using fn_complete_t = std::function<void()>;
-
+    
 class subscriber : public cxx::enable_shared_from_this<subscriber>
 {
 public:
     using sp = cxx::shared_ptr<subscriber>;
     
 private:
-    subscriber() {}
+    subscriber() = default;
     
     fn_next_t       m_fnNext;
     fn_error_t      m_fnError;
@@ -39,7 +89,6 @@ private:
     }
     
 protected:
-    
 public:
     virtual ~subscriber() = default;
     
@@ -49,12 +98,12 @@ public:
         fn_complete_t complete = fn_complete_t()
     )
     {
-        auto s = cxx::shared_ptr<subscriber>(new subscriber());
+        auto s = sp(new subscriber());
         s->setup(next, error, complete);
         return s;
     }
     
-    void next(value v)
+    void next(abstruct_value::sp v)
     {
         if(m_fnNext){
             try{
@@ -95,21 +144,18 @@ public:
 
 class observable : public cxx::enable_shared_from_this<observable>
 {
-private:
+public:
     using sp = cxx::shared_ptr<observable>;
     
-    
 private:
-    observable() {}
+    observable() = default;
     cxx::function<void(subscriber::sp)>    m_generator;
     
 protected:
-    
-    
 public:
     static sp create(cxx::function<void(subscriber::sp)> generator)
     {
-        auto s = cxx::shared_ptr<observable>(new observable());
+        auto s = sp(new observable());
         s->m_generator = generator;
         return s;
     }
@@ -123,7 +169,7 @@ public:
     )
     {
         auto _THIS = shared_from_this();
-        m_generator(subscriber::create([_THIS, next](value v){
+        m_generator(subscriber::create([_THIS, next](abstruct_value::sp v){
             next(v);
         }, [_THIS, error](error_ptr e){
             error(e);
@@ -140,7 +186,7 @@ public:
     {
         auto _THIS = shared_from_this();
         return observable::create([_THIS, next, error, complete](subscriber::sp s){
-            _THIS->subscribe([_THIS, next, s](value v){
+            _THIS->subscribe([_THIS, next, s](abstruct_value::sp v){
                 if(next){
                     next(v);
                 }
@@ -159,11 +205,11 @@ public:
         });
     }
     
-    observable::sp map(cxx::function<value(value)> f)
+    observable::sp map(cxx::function<abstruct_value::sp(abstruct_value::sp)> f)
     {
         auto _THIS = shared_from_this();
         return observable::create([_THIS, f](subscriber::sp s){
-            _THIS->subscribe([_THIS, f, s](value v){
+            _THIS->subscribe([_THIS, f, s](abstruct_value::sp v){
                 s->next(f(v));
             }, [_THIS, s](error_ptr e){
                 s->error(e);
@@ -173,12 +219,12 @@ public:
         });
     }
     
-    observable::sp flat_map(cxx::function<observable::sp(value)> f)
+    observable::sp flat_map(cxx::function<observable::sp(abstruct_value::sp)> f)
     {
         auto _THIS = shared_from_this();
         return observable::create([_THIS, f](subscriber::sp s){
-            _THIS->subscribe([_THIS, f, s](value v){
-                f(v)->subscribe([_THIS, s](value fv){
+            _THIS->subscribe([_THIS, f, s](abstruct_value::sp v){
+                f(v)->subscribe([_THIS, s](abstruct_value::sp fv){
                     s->next(fv);
                 }, [_THIS, s](error_ptr fe){
                     s->error(fe);
