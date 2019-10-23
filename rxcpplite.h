@@ -9,14 +9,11 @@ namespace rxcpplite
 namespace cxx   = std;
 using error_ptr = std::exception_ptr;
 
-
 using value = int;
-
 
 using fn_next_t     = std::function<void(value)>;
 using fn_error_t    = std::function<void(error_ptr)>;
 using fn_complete_t = std::function<void()>;
-
 
 class subscriber : public cxx::enable_shared_from_this<subscriber>
 {
@@ -24,6 +21,8 @@ public:
     using sp = cxx::shared_ptr<subscriber>;
     
 private:
+    subscriber() {}
+    
     fn_next_t       m_fnNext;
     fn_error_t      m_fnError;
     fn_complete_t   m_fnComplete;
@@ -50,7 +49,7 @@ public:
         fn_complete_t complete = fn_complete_t()
     )
     {
-        auto s = cxx::make_shared<subscriber>();
+        auto s = cxx::shared_ptr<subscriber>(new subscriber());
         s->setup(next, error, complete);
         return s;
     }
@@ -101,6 +100,7 @@ private:
     
     
 private:
+    observable() {}
     cxx::function<void(subscriber::sp)>    m_generator;
     
 protected:
@@ -109,7 +109,7 @@ protected:
 public:
     static sp create(cxx::function<void(subscriber::sp)> generator)
     {
-        auto s = cxx::make_shared<observable>();
+        auto s = cxx::shared_ptr<observable>(new observable());
         s->m_generator = generator;
         return s;
     }
