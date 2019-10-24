@@ -232,18 +232,32 @@ public:
     {
         auto _THIS = shared_from_this();
         return observable::create([_THIS, f](subscriber::sp s){
-            _THIS->subscribe([_THIS, f, s](abstruct_value::sp v){
+            auto bCompletedAbove     = cxx::make_shared<bool>(false);
+            auto internalSubscribers = cxx::make_shared<int>(0);
+
+            auto completeConditionaly = [s, bCompletedAbove, internalSubscribers](){
+                if(*bCompletedAbove){
+                    if(*internalSubscribers == 0){
+                        s->complete();
+                    }
+                }
+            };
+            
+            _THIS->subscribe([_THIS, f, s, internalSubscribers, completeConditionaly](abstruct_value::sp v){
+                *internalSubscribers = *internalSubscribers + 1;
                 f(v)->subscribe([_THIS, s](abstruct_value::sp fv){
                     s->next(fv);
                 }, [_THIS, s](error_ptr fe){
                     s->error(fe);
-                }, [_THIS, s](){
-                    s->complete();
+                }, [_THIS, s, internalSubscribers, completeConditionaly](){
+                    *internalSubscribers = *internalSubscribers - 1;
+                    completeConditionaly();
                 });
             }, [_THIS, s](error_ptr e){
                 s->error(e);
-            }, [_THIS, s](){
-                s->complete();
+            }, [_THIS, s, bCompletedAbove, completeConditionaly](){
+                *bCompletedAbove = true;
+                completeConditionaly();
             });
         });
     }
