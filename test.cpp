@@ -1,6 +1,7 @@
 #include "rxcpplite.h"
 #include <iostream>
 #include <sstream>
+#include <future>
 
 class Test
 {
@@ -12,7 +13,9 @@ public:
         using namespace rxcpplite;
         
         observable::create([=](subscriber::sp s){
-            s->next(typed_value<int>::create(1));
+            for(int i = 0; i < 10; i++){
+                s->next(value(std::move(i)));
+            }
             s->complete();
         })
         ->tap([=](abstruct_value::sp v){
@@ -33,7 +36,7 @@ public:
             log() << "tap(1):complete" << std::endl;
         })
         ->map([=](abstruct_value::sp v){
-            return typed_value<int>::create(v->value<int>() * 2);
+            return value(v->value<int>() * 2);
         })
         ->tap([=](abstruct_value::sp v){
             log() << "tap(2):next " << v->value<int>() << std::endl;
@@ -46,9 +49,9 @@ public:
             return observable::create([=](subscriber::sp s){
                 std::stringstream ss;
                 ss << "value = " << v->value<int>();
-                s->next(typed_value<std::string>::create(ss.str()));
-                s->next(typed_value<std::string>::create("ABC"));
-                s->next(typed_value<std::string>::create("DEF"));
+                s->next(value(ss.str()));
+                s->next(value<std::string>("ABC"));
+                s->next(value<std::string>("DEF"));
                 s->complete();
             });
         })

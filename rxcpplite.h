@@ -42,7 +42,7 @@ public:
 private:
     T m_value;
     typed_value(T&& v) : m_value(v) {}
-    typed_value(T& v) : m_value(v) {}
+    typed_value(const T& v) : m_value(v) {}
 
 protected:
 
@@ -52,14 +52,23 @@ public:
         return sp(new typed_value<T>(v));
     }
 
-    static sp create(T& v)
+    static sp create(const T& v)
     {
-        return sp(new typed_value<T>(std::forward(v)));
+        return sp(new typed_value<T>(v));
     }
-    
+
+
     const T& value() const { return m_value; }
     operator const T& () const { return m_value; }
 };
+
+template <typename T> typename typed_value<T>::sp value(T&& v){
+    return typed_value<T>::create(v);
+}
+
+template <typename T> typename typed_value<T>::sp value(const T& v){
+    return typed_value<T>::create(v);
+}
 
 using fn_next_t     = std::function<void(abstruct_value::sp)>;
 using fn_error_t    = std::function<void(error_ptr)>;
